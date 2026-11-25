@@ -21,10 +21,7 @@ class SummaryCard extends StatelessWidget {
         padding: EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(
-              value.toString(),
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
+            Text(value.toString(), style: TextStyle(fontSize: 24)),
             Text(title),
           ],
         ),
@@ -42,20 +39,19 @@ class _HomeScreenState extends State<HomeScreen> {
     {'subject': 'mathematics', 'hours': 5, 'done': false},
     {'subject': 'physics', 'hours': 3, 'done': false},
   ];
+
   int getTotalHours() {
     int total = 0;
-    for (int i = 0; i < goals.length; i++) {
-      total = total + (goals[i]['hours'] as int);
+    for (var goal in goals) {
+      total = total + (goal['hours'] as int);
     }
     return total;
   }
 
   int getCompleted() {
     int count = 0;
-    for (int i = 0; i < goals.length; i++) {
-      if (goals[i]['done'] == true) {
-        count = count + 1;
-      }
+    for (var goal in goals) {
+      if (goal['done'] == true) count = count + 1;
     }
     return count;
   }
@@ -64,23 +60,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return goals.length - getCompleted();
   }
 
-  void addSampleGoal() {
-    setState(() {
-      goals.add({
-        'subject': 'New goal' + (goals.length + 1).toString(),
-        'hours': 2,
-        'done': false,
+  void openAddGoalScreen() async {
+    final newGoal = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AddGoalScreen()),
+    );
+
+    if (newGoal != null) {
+      setState(() {
+        goals.add(newGoal);
       });
-    });
+    }
   }
 
   void toggleGoal(int index) {
     setState(() {
-      if (goals[index]['done'] == true) {
-        goals[index]['done'] = false;
-      } else {
-        goals[index]['done'] = true;
-      }
+      goals[index]['done'] = !goals[index]['done'];
     });
   }
 
@@ -104,30 +99,27 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListTile(
               leading: Checkbox(
                 value: goals[index]['done'],
-                onChanged: (value) {
-                  toggleGoal(index);
-                },
+                onChanged: (value) => toggleGoal(index),
               ),
               title: Text(
                 goals[index]['subject'],
                 style: TextStyle(
-                  decoration: goals[index]['done'] == true
+                  decoration: goals[index]['done']
                       ? TextDecoration.lineThrough
                       : TextDecoration.none,
                 ),
               ),
-              subtitle: Text(goals[index]['hours'].toString() + 'hours'),
+              subtitle: Text('${goals[index]['hours']} hours'),
               trailing: IconButton(
                 icon: Icon(Icons.delete),
-                onPressed: () {
-                  deleteGoal(index);
-                },
+                onPressed: () => deleteGoal(index),
               ),
             ),
           );
         },
       );
     }
+
     return Scaffold(
       appBar: AppBar(title: Text('My study planner')),
       body: Column(
@@ -143,8 +135,72 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: addSampleGoal,
+        onPressed: openAddGoalScreen,
         child: Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class AddGoalScreen extends StatefulWidget {
+  State<AddGoalScreen> createState() => _AddGoalScreenState();
+}
+
+class _AddGoalScreenState extends State<AddGoalScreen> {
+  TextEditingController subjectController = TextEditingController();
+  TextEditingController hoursController = TextEditingController();
+  String? subjectError;
+  String? hoursError;
+  void dispose() {
+    subjectController.dispose();
+    hoursController.dispose();
+    super.dispose();
+  }
+
+  void saveGoal() {
+    String subject = subjectController.text.trim();
+    int? hours = int.tryParse(hoursController.text.trim());
+
+    setState(() {
+      subjectError = subject.isEmpty ? 'Enter a subject' : null;
+      hoursError = (hours == null || hours <= 0) ? 'Enter hours above 0' : null;
+    });
+
+    if (subjectError == null && hoursError == null) {
+      Navigator.pop(context, {
+        'subject': subject,
+        'hours': hours,
+        'done': false,
+      });
+    }
+  }
+
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Add goal')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: subjectController,
+              decoration: InputDecoration(
+                labelText: 'Subject',
+                errorText: subjectError,
+              ),
+            ),
+            TextField(
+              controller: hoursController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Hours',
+                errorText: hoursError,
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(onPressed: saveGoal, child: Text('Save')),
+          ],
+        ),
       ),
     );
   }
