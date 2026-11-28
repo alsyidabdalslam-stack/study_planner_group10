@@ -1,6 +1,13 @@
 import "package:material_ui/material_ui.dart";
+import 'package:flutter/widgets.dart';
+//import 'package:firebase_core/firebase_core.dart';
 
-void main() {
+//import 'firebase_options.dart';
+import 'database_helper.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DatabaseHelper.initDatabase();
   runApp(MyApp());
 }
 
@@ -14,7 +21,6 @@ class SummaryCard extends StatelessWidget {
   final String title;
   final int value;
   SummaryCard(this.title, this.value);
-
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
@@ -35,10 +41,27 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Map<String, dynamic>> goals = [
-    {'subject': 'mathematics', 'hours': 5, 'done': false},
-    {'subject': 'physics', 'hours': 3, 'done': false},
-  ];
+  List<Map<String, dynamic>> goals = [];
+  bool isloading = true;
+  void initState() {
+    super.initState();
+    loadGoals();
+  }
+
+  void loadGoals() async {
+    try {
+      List<Map<String, dynamic>> savedGoals = await DatabaseHelper.getGoals();
+      setState(() {
+        goals = savedGoals;
+        isloading = false;
+      });
+    } catch (e) {
+      print('Error loading goals: $e');
+      setState(() {
+        isloading = false;
+      });
+    }
+  }
 
   int getTotalHours() {
     int total = 0;
@@ -65,21 +88,25 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (context) => AddGoalScreen()),
     );
-
     if (newGoal != null) {
+      String id = await DatabaseHelper.insertGoal(newGoal);
+      newGoal['id'] = id;
       setState(() {
         goals.add(newGoal);
       });
     }
   }
 
-  void toggleGoal(int index) {
+  void toggleGoal(int index) async {
+    bool newDone = !goals[index]['done'];
+    await DatabaseHelper.updateGoal(goals[index]['id'], newDone);
     setState(() {
-      goals[index]['done'] = !goals[index]['done'];
+      goals[index]['done'] = newDone;
     });
   }
 
-  void deleteGoal(int index) {
+  void deletegoal(int index) async {
+    await DatabaseHelper.deleteGoal(goals[index]['id']);
     setState(() {
       goals.removeAt(index);
     });
@@ -87,7 +114,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget build(BuildContext context) {
     Widget listArea;
-    if (goals.isEmpty) {
+    if (isloading) {
+      listArea = Center(child: CircularProgressIndicator());
+    } else if (goals.isEmpty) {
       listArea = Center(
         child: Text('No goals yet. Tap + to add your first one!'),
       );
@@ -112,16 +141,15 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: Text('${goals[index]['hours']} hours'),
               trailing: IconButton(
                 icon: Icon(Icons.delete),
-                onPressed: () => deleteGoal(index),
+                onPressed: () => deletegoal(index),
               ),
             ),
           );
         },
       );
     }
-
     return Scaffold(
-      appBar: AppBar(title: Text('My study planner')),
+      appBar: AppBar(title: Text('my study planner')),
       body: Column(
         children: [
           Row(
@@ -143,6 +171,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class AddGoalScreen extends StatefulWidget {
+  const AddGoalScreen({super.key});
+
   State<AddGoalScreen> createState() => _AddGoalScreenState();
 }
 
@@ -157,15 +187,13 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     super.dispose();
   }
 
-  void saveGoal() {
+  void savedGoals() {
     String subject = subjectController.text.trim();
     int? hours = int.tryParse(hoursController.text.trim());
-
     setState(() {
       subjectError = subject.isEmpty ? 'Enter a subject' : null;
-      hoursError = (hours == null || hours <= 0) ? 'Enter hours above 0' : null;
+      hoursError = (hours == null || hours <= 0) ? 'Enter hours above o' : null;
     });
-
     if (subjectError == null && hoursError == null) {
       Navigator.pop(context, {
         'subject': subject,
@@ -193,12 +221,12 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
               controller: hoursController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Hours',
+                labelText: 'hours',
                 errorText: hoursError,
               ),
             ),
-            SizedBox(height: 20),
-            ElevatedButton(onPressed: saveGoal, child: Text('Save')),
+            SizedBox(height: 21),
+            ElevatedButton(onPressed: savedGoals, child: Text('Save')),
           ],
         ),
       ),
